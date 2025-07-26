@@ -1,0 +1,46 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: database
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql_password
+      MYSQL_DATABASE: order_app
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - app-network
+  backend:
+    build: ./backend
+    container_name: backend_express
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+    networks:
+      - app-network
+  frontend:
+    build: ./frontend
+    container_name: frontend_vue
+    ports:
+      - "8080:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
