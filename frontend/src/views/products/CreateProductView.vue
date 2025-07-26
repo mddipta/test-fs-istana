@@ -3,6 +3,14 @@
     <div class="p-8 bg-white rounded-xl shadow-lg">
       <h2 class="text-2xl font-bold text-gray-800 mb-1">Create New Product</h2>
 
+      <div
+        v-if="message"
+        class="mb-4 p-4 rounded-md"
+        :class="messageType === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'"
+      >
+        {{ message }}
+      </div>
+
       <form @submit.prevent="handleSaveProduct" class="space-y-6">
         <div>
           <label for="product-code" class="block text-sm font-medium text-gray-700">
@@ -84,9 +92,10 @@
           </button>
           <button
             type="submit"
-            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            :disabled="isLoading"
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
-            Save Product
+            {{ isLoading ? 'Saving...' : 'Save Product' }}
           </button>
         </div>
       </form>
@@ -95,7 +104,7 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -107,11 +116,24 @@ const product = reactive({
   stock: null,
 })
 
-const handleSaveProduct = async () => {
-  try {
-    const token = localStorage.getItem('token')
+const isLoading = ref(false)
+const message = ref('')
+const messageType = ref('')
 
-    const fetchResponse = await fetch('http://localhost:3000/products', {
+const handleSaveProduct = async () => {
+  isLoading.value = true
+  message.value = ''
+
+  try {
+    const token = localStorage.getItem('authToken')
+
+    if (!token) {
+      message.value = 'Authentication token not found. Please login again.'
+      messageType.value = 'error'
+      return
+    }
+
+    const response = await fetch('http://localhost:3000/api/v1/products', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,13 +141,42 @@ const handleSaveProduct = async () => {
       },
       body: JSON.stringify(product),
     })
+
+    const data = await response.json()
+
+    if (response.ok) {
+      message.value = 'Product created successfully!'
+      messageType.value = 'success'
+
+      Object.assign(product, {
+        code: '',
+        name: '',
+        price: null,
+        stock: null,
+      })
+
+      setTimeout(() => {
+        router.push('/products')
+      }, 2000)
+    } else {
+      message.value = data.message || 'Failed to create product'
+      messageType.value = 'error'
+
+      if (response.status === 401) {
+        localStorage.removeItem('authToken')
+        router.push('/login')
+      }
+    }
   } catch (error) {
+    console.error('Error creating product:', error)
+    message.value = 'Network error. Please try again.'
+    messageType.value = 'error'
   } finally {
+    isLoading.value = false
   }
 }
 
 const handleCancel = () => {
-  // Navigate back to the product list view
   router.push('/products')
 }
 </script>
